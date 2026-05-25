@@ -36,6 +36,7 @@ attn_implementation: 'auto'  # Attention implementation (auto/eager/sdpa/flash_a
 add_to_beatmap: false     # Add generated content to the reference beatmap
 overwrite_reference_beatmap: false # Overwrite the reference beatmap instead of creating a new one
 export_osz: false         # Export beatmap as .osz file
+osz_audio_path: ''        # mods: clean audio for .osz/AudioFilename when audio_path is a tool track (click-injected)
 start_time: null          # Start time of audio to generate beatmap for
 end_time: null            # End time of audio to generate beatmap for
 lookback: 0.5             # Fraction of audio sequence to fill with tokens from previous inference window
@@ -49,6 +50,14 @@ timing_temperature: 0.1 # Sampling temperature for timing
 mania_column_temperature: 0.8 # Sampling temperature for mania columns
 taiko_hit_temperature: 0.8    # Sampling temperature for taiko hit types
 timeshift_bias: 0.0        # Logit bias for sampling timeshift tokens
+# --- mods: creative steering (see mods/ package) ---
+# Object-type biases apply only at type-decision steps; model is confident, use ~10-30.
+circle_bias: 0.0           # Logit bias on circle tokens (e.g. +20 = strongly prefer circles)
+slider_bias: 0.0           # Logit bias on slider tokens (e.g. -30 = suppress sliders)
+spinner_bias: 0.0          # Logit bias on spinner tokens
+rhythm_density_bias: 0.0   # Ramp bias on timeshift tokens (positive = denser rhythm)
+spacing_multiplier: 1.0    # Post-process jump-spacing amplifier (1.0 = off)
+spacing_max_jump: 0        # Cap (px) on amplified jump distance (0 = playfield clamp only)
 top_p: 0.95              # Top-p sampling threshold
 top_k: 0                # Top-k sampling threshold
 parallel: false         # Use parallel sampling

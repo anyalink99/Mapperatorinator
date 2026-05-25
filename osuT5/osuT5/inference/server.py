@@ -11,7 +11,7 @@ from transformers import LogitsProcessorList, ClassifierFreeGuidanceLogitsProces
 from ..event import EventType, ContextType
 from .logit_processors import ConditionalTemperatureLogitsWarper, get_beat_type_tokens, \
     get_mania_type_tokens, get_scroll_speed_tokens, TimeshiftBias, LookbackBiasLogitsWarper, \
-    MonotonicTimeShiftLogitsProcessor
+    MonotonicTimeShiftLogitsProcessor, ObjectTypeBias, RhythmDensityBias
 from .cache_utils import get_cache
 from ..model import Mapperatorinator
 from ..tokenizer import Tokenizer
@@ -54,6 +54,10 @@ def model_generate(model, tokenizer, model_kwargs, generate_kwargs):
     taiko_hit_temperature = generate_kwargs.pop('taiko_hit_temperature', temperature)
     lookback_time = generate_kwargs.pop('lookback_time', 0.0)
     lookahead_time = generate_kwargs.pop('lookahead_time', 0.0)
+    circle_bias = generate_kwargs.pop('circle_bias', 0.0)
+    slider_bias = generate_kwargs.pop('slider_bias', 0.0)
+    spinner_bias = generate_kwargs.pop('spinner_bias', 0.0)
+    rhythm_density_bias = generate_kwargs.pop('rhythm_density_bias', 0.0)
     context_type = generate_kwargs.pop('context_type', None)
     if context_type is not None:
         context_type = ContextType(context_type)  # Convert to ContextType enum
@@ -73,6 +77,16 @@ def model_generate(model, tokenizer, model_kwargs, generate_kwargs):
                 tokenizer.event_end[EventType.TIME_SHIFT]
             )
         )
+    if circle_bias or slider_bias or spinner_bias:
+        logits_processor_list.append(
+            ObjectTypeBias(tokenizer, {
+                EventType.CIRCLE: circle_bias,
+                EventType.SLIDER_HEAD: slider_bias,
+                EventType.SPINNER: spinner_bias,
+            })
+        )
+    if rhythm_density_bias:
+        logits_processor_list.append(RhythmDensityBias(tokenizer, rhythm_density_bias))
     if types_first:
         logits_processor_list.append(ConditionalTemperatureLogitsWarper(
             temperature,

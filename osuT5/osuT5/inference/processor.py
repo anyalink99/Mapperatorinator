@@ -149,6 +149,11 @@ class Processor(object):
         self.max_batch_size = args.max_batch_size
 
         self.timeshift_bias = args.timeshift_bias
+        # Creative steering biases (mods): nudge object-type and rhythm-density distributions.
+        self.circle_bias = getattr(args, "circle_bias", 0.0)
+        self.slider_bias = getattr(args, "slider_bias", 0.0)
+        self.spinner_bias = getattr(args, "spinner_bias", 0.0)
+        self.rhythm_density_bias = getattr(args, "rhythm_density_bias", 0.0)
         self.types_first = args.train.data.types_first
 
     def model_generate(self, model_kwargs, **generate_kwargs: Any) -> Any:
@@ -161,6 +166,10 @@ class Processor(object):
             max_length=self.tgt_seq_len,
             cfg_scale=self.cfg_scale,
             timeshift_bias=self.timeshift_bias,
+            circle_bias=self.circle_bias,
+            slider_bias=self.slider_bias,
+            spinner_bias=self.spinner_bias,
+            rhythm_density_bias=self.rhythm_density_bias,
             types_first=self.types_first,
             temperature=self.temperature,
             timing_temperature=self.timing_temperature,

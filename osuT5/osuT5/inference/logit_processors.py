@@ -133,6 +133,82 @@ class LookbackBiasLogitsWarper(LogitsProcessor):
         return scores_processed
 
 
+# Hit-object "head" tokens that mark the start of a new object group (types_first).
+# The bias must only fire when the model is actually choosing an object type,
+# otherwise it corrupts time/position/eos steps and breaks generation.
+_OBJECT_HEAD_TYPES = (
+    EventType.CIRCLE,
+    EventType.SLIDER_HEAD,
+    EventType.SPINNER,
+    EventType.HOLD_NOTE,
+)
+
+
+def _object_head_tokens(tokenizer: Tokenizer) -> tuple[int, ...]:
+    return tuple(
+        tokenizer.event_start[t] for t in _OBJECT_HEAD_TYPES if t in tokenizer.event_start
+    )
+
+
+class ObjectTypeBias(LogitsProcessor):
+    """Steer generation toward/away from specific hit-object types (e.g. negative
+    slider bias + positive circle bias to turn a slider-heavy map into a
+    jump/circle-heavy one).
+
+    The bias is applied *only at object-type decision steps* — detected by the
+    unbiased argmax landing on an object-head token — so it never corrupts the
+    time/position/eos steps in between. biases: EventType -> additive logit bias.
+    """
+
+    def __init__(self, tokenizer: Tokenizer, biases: dict):
+        self.ranges: list[tuple[int, int, float]] = []
+        for event_type, bias in biases.items():
+            if not bias or event_type not in tokenizer.event_start:
+                continue
+            self.ranges.append(
+                (tokenizer.event_start[event_type], tokenizer.event_end[event_type], float(bias))
+            )
+        self._head_tokens = torch.tensor(_object_head_tokens(tokenizer), dtype=torch.long)
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
+        if not self.ranges:
+            return scores
+        head_tokens = self._head_tokens.to(scores.device)
+        at_type_step = torch.isin(scores.argmax(dim=-1), head_tokens)  # [batch]
+        if not at_type_step.any():
+            return scores
+        scores_processed = scores.clone()
+        for start, end, bias in self.ranges:
+            scores_processed[at_type_step, start:end] += bias
+        return scores_processed
+
+
+class RhythmDensityBias(LogitsProcessor):
+    """Biases time-shift tokens with a linear ramp favouring smaller deltas
+    (positive strength = denser rhythm). Applied only when the model is choosing a
+    time-shift (unbiased argmax in the time-shift range) so it reshapes the delta
+    distribution without making spurious time-shifts appear elsewhere.
+    """
+
+    def __init__(self, tokenizer: Tokenizer, strength: float):
+        self.start = tokenizer.event_start[EventType.TIME_SHIFT]
+        self.end = tokenizer.event_end[EventType.TIME_SHIFT]
+        n = self.end - self.start
+        # token index increases with the time delta, so ramp from +strength (small
+        # delta) down to -strength (large delta) to pull mass toward dense rhythms.
+        self.ramp = torch.linspace(float(strength), -float(strength), n)
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.Tensor:
+        argmax = scores.argmax(dim=-1)
+        at_timeshift = (argmax >= self.start) & (argmax < self.end)  # [batch]
+        if not at_timeshift.any():
+            return scores
+        scores_processed = scores.clone()
+        self.ramp = self.ramp.to(device=scores.device, dtype=scores.dtype)
+        scores_processed[at_timeshift, self.start:self.end] += self.ramp
+        return scores_processed
+
+
 class MonotonicTimeShiftLogitsProcessor(LogitsProcessor):
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer

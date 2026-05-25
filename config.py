@@ -49,6 +49,7 @@ class InferenceConfig:
     add_to_beatmap: bool = False  # Add generated content to the reference beatmap
     overwrite_reference_beatmap: bool = False  # Overwrite the reference beatmap instead of creating a new one
     export_osz: bool = False  # Export beatmap as .osz file
+    osz_audio_path: str = ''  # mods: clean audio for the .osz/AudioFilename when audio_path is a tool track (e.g. click-injected)
     start_time: Optional[int] = None  # Start time of audio to generate beatmap for
     end_time: Optional[int] = None  # End time of audio to generate beatmap for
     lookback: float = 0.5  # Fraction of audio sequence to fill with tokens from previous inference window
@@ -62,6 +63,14 @@ class InferenceConfig:
     mania_column_temperature: float = 0.5  # Sampling temperature for mania columns
     taiko_hit_temperature: float = 0.5  # Sampling temperature for taiko hit types
     timeshift_bias: float = 0.0  # Logit bias for sampling timeshift tokens
+    # --- mods: creative steering (biases applied only at object-type decision
+    # steps; the model is very confident so use large magnitudes ~10-30) ---
+    circle_bias: float = 0.0  # Logit bias on circle tokens (e.g. +20 = strongly prefer circles)
+    slider_bias: float = 0.0  # Logit bias on slider tokens (e.g. -30 = suppress sliders)
+    spinner_bias: float = 0.0  # Logit bias on spinner tokens
+    rhythm_density_bias: float = 0.0  # Ramp bias on timeshift tokens (positive = denser rhythm)
+    spacing_multiplier: float = 1.0  # Post-process jump-spacing amplifier (1.0 = off)
+    spacing_max_jump: int = 0  # Cap (px) on amplified jump distance (0 = playfield clamp only)
     top_p: float = 0.95  # Top-p sampling threshold
     top_k: int = 0  # Top-k sampling threshold
     parallel: bool = False  # Use parallel sampling

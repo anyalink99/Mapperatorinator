@@ -353,7 +353,7 @@ def get_config(args: InferenceConfig):
         title_unicode=args.title_unicode,
         artist=args.artist,
         artist_unicode=args.artist_unicode,
-        audio_filename=Path(args.audio_path).name,
+        audio_filename=Path(args.osz_audio_path or args.audio_path).name,
         hp_drain_rate=args.hp_drain_rate,
         circle_size=(args.keycount if args.gamemode == 3 else args.circle_size) or 4,
         overall_difficulty=args.overall_difficulty,
@@ -524,6 +524,14 @@ def generate(
         if verbose:
             logger.info(f"Merged generated content with reference beatmap")
 
+    # mods: amplify jump spacing as a post-process (std only; rhythm untouched).
+    if getattr(args, "spacing_multiplier", 1.0) != 1.0 and args.gamemode == 0:
+        from mods.geometry import amplify_spacing
+        max_jump = getattr(args, "spacing_max_jump", 0) or None
+        result = amplify_spacing(result, args.spacing_multiplier, max_jump=max_jump)
+        if verbose:
+            logger.info(f"Amplified jump spacing x{args.spacing_multiplier}")
+
     result_path = None
     osz_path = None
 
@@ -538,7 +546,9 @@ def generate(
 
     if args.export_osz:
         osz_path = os.path.join(output_path, f"beatmap{str(uuid.uuid4().hex)}.osz")
-        postprocessor.export_osz(result_path, audio_path, osz_path, args.background)
+        # Bundle the clean audio (osz_audio_path) when audio_path is a tool track (e.g. click-injected).
+        osz_audio = args.osz_audio_path or audio_path
+        postprocessor.export_osz(result_path, osz_audio, osz_path, args.background)
         if verbose:
             logger.info(f"Generated .osz saved to {osz_path}")
 
